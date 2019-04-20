@@ -9,6 +9,15 @@ public class FastDFSFile {
     private String md5;
     private String author;
 
+    public FastDFSFile() {
+    }
+
+    public FastDFSFile(String fileName, byte[] file_buff, String ext) {
+        this.name = fileName;
+        this.content = file_buff;
+        this.ext = ext;
+    }
+
     public String getName() {
         return name;
     }

@@ -44,12 +44,8 @@ public class FastDFSClientTest {
 
     @Test
     public void getFile() {
-        File file = new File("C:\\Users\\汪成胜\\Pictures\\reso\\002.jpg");
-        System.out.println(file.getName());
-        System.out.println(file.getParent());
-        System.out.println(file.getPath());
-        System.out.println(file.getAbsolutePath());
-        System.out.println(file.getAbsoluteFile());
+        FileInfo fileInfo = FastDFSClient.getFile("group1", "M00/00/00/wKgAbVy4Iy6ATsJJAAamQXf8J1o225_big.jpg");
+        System.out.println(fileInfo);
     }
 
     @Test

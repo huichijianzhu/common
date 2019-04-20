@@ -14,20 +14,12 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class FastDFSClient {
-    private static TrackerClient trackerClient;
-    private static TrackerServer trackerServer;
-    private static StorageServer storageServer;
-    private static StorageClient storageClient;
     private static Logger logger = LoggerFactory.getLogger(FastDFSClient.class);
 
 	static {
 		try {
 			String filePath = new ClassPathResource("fdfs_client.conf").getFile().getAbsolutePath();
-//            String filePath = "E:\\hjmall\\hjmall-common\\src\\main\\resources\\fdfs_client.conf";
             ClientGlobal.init(filePath);
-			trackerClient = new TrackerClient();
-			trackerServer = trackerClient.getConnection();
-			storageServer = trackerClient.getStoreStorage(trackerServer);
 		} catch (Exception e) {
 			logger.error("FastDFS Client Init Fail!",e);
 		}
@@ -37,18 +29,22 @@ public class FastDFSClient {
      * 使用FastDFS提供的客户端storageClient来进行文件上传，最后将上传结果返回
      *
      * @param file
-     * @return
+     * @return 2 elements string array if success:
+     * results[0]: the group name to store the file
+     * results[1]: the new created filename
+     * return null if fail
      */
     public static String[] upload(FastDFSFile file) {
-         logger.info("File Name: " + file.getName() + "File Length:" + file.getContent().length);
+        logger.info("File Name: " + file.getName() + "File Length:" + file.getContent().length);
 
         NameValuePair[] meta_list = new NameValuePair[1];
         meta_list[0] = new NameValuePair("author", file.getAuthor());
 
         long startTime = System.currentTimeMillis();
         String[] uploadResults = null;
+        StorageClient storageClient=null;
         try {
-            storageClient = new StorageClient(trackerServer, storageServer);
+            storageClient = getTrackerClient();
             uploadResults = storageClient.upload_file(file.getContent(), file.getExt(), meta_list);
         } catch (IOException e) {
             logger.error("IO Exception when uploadind the file:" + file.getName(), e);
@@ -57,7 +53,7 @@ public class FastDFSClient {
         }
         logger.info("upload_file time used:" + (System.currentTimeMillis() - startTime) + " ms");
 
-        if (uploadResults == null) {
+        if (uploadResults == null && storageClient!=null) {
             logger.error("upload file fail, error code:" + storageClient.getErrorCode());
         }
         String groupName = uploadResults[0];
@@ -67,15 +63,24 @@ public class FastDFSClient {
         return uploadResults;
     }
 
+    /**
+     * 本地文件上传
+     * @param file
+     * @return 2 elements string array if success:
+     * results[0]: the group name to store the file
+     * results[1]: the new created filename
+     * return null if fail
+     */
     public static String[] uploadLocal(File file) {
 
         logger.info("File Name: " + file.getName() + "File Length:" + file.length());
 
         long startTime = System.currentTimeMillis();
         String[] uploadResults = null;
+        StorageClient storageClient = null;
         try {
-            storageClient = new StorageClient(trackerServer, storageServer);
-            uploadResults = storageClient.upload_file(file.getAbsolutePath(), file.getName().substring(file.getName().lastIndexOf(".")), null);
+            storageClient = getTrackerClient();
+            uploadResults = storageClient.upload_file(file.getAbsolutePath(), file.getName().substring(file.getName().lastIndexOf(".")+1), null);
         } catch (IOException e) {
             logger.error("IO Exception when uploadind the file:" + file.getName(), e);
         } catch (Exception e) {
@@ -83,7 +88,7 @@ public class FastDFSClient {
         }
         logger.info("upload_file time used:" + (System.currentTimeMillis() - startTime) + " ms");
 
-        if (uploadResults == null) {
+        if (uploadResults == null && storageClient!=null) {
             logger.error("upload file fail, error code:" + storageClient.getErrorCode());
         }
         String groupName = uploadResults[0];
@@ -102,7 +107,7 @@ public class FastDFSClient {
      */
     public static FileInfo getFile(String groupName, String remoteFileName) {
         try {
-            storageClient = new StorageClient(trackerServer, storageServer);
+            StorageClient storageClient = getTrackerClient();
             return storageClient.get_file_info(groupName, remoteFileName);
         } catch (IOException e) {
             logger.error("IO Exception: Get File from Fast DFS failed", e);
@@ -120,7 +125,7 @@ public class FastDFSClient {
      */
     public static InputStream downFile(String groupName, String remoteFileName) {
         try {
-            storageClient = new StorageClient(trackerServer, storageServer);
+            StorageClient storageClient = getTrackerClient();
             byte[] fileByte = storageClient.download_file(groupName, remoteFileName);
             InputStream ins = new ByteArrayInputStream(fileByte);
             return ins;
@@ -140,11 +145,40 @@ public class FastDFSClient {
      */
     public static void deleteFile(String groupName, String remoteFileName)
             throws Exception {
-        storageClient = new StorageClient(trackerServer, storageServer);
+        StorageClient storageClient = getTrackerClient();
         int i = storageClient.delete_file(groupName, remoteFileName);
         logger.info("delete file successfully!!!" + i);
     }
 
+    public static StorageServer[] getStoreStorages(String groupName)
+            throws IOException {
+        TrackerClient trackerClient = new TrackerClient();
+        TrackerServer trackerServer = trackerClient.getConnection();
+        return trackerClient.getStoreStorages(trackerServer, groupName);
+    }
+
+    public static ServerInfo[] getFetchStorages(String groupName,
+                                                String remoteFileName) throws IOException {
+        TrackerClient trackerClient = new TrackerClient();
+        TrackerServer trackerServer = trackerClient.getConnection();
+        return trackerClient.getFetchStorages(trackerServer, groupName, remoteFileName);
+    }
+
+    public static String getTrackerUrl() throws IOException {
+        return "http://"+getTrackerServer().getInetSocketAddress().getHostString()+":"+ ClientGlobal.getG_tracker_http_port()+"/";
+    }
+
+    private static StorageClient getTrackerClient() throws IOException {
+        TrackerServer trackerServer = getTrackerServer();
+        StorageClient storageClient = new StorageClient(trackerServer, null);
+        return  storageClient;
+    }
+
+    private static TrackerServer getTrackerServer() throws IOException {
+        TrackerClient trackerClient = new TrackerClient();
+        TrackerServer trackerServer = trackerClient.getConnection();
+        return  trackerServer;
+    }
 
 	
 }
