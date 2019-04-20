@@ -1,4 +1,4 @@
-package com.hcjz.common.utils;
+package com.hcjz.common.utils.cookie;
 import java.util.Random;
 
 /**
